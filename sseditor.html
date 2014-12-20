@@ -3,11 +3,10 @@
 <meta charset="UTF-8" />
 <title>说说编辑器</title>
 <style type="text/css">
-#emotion{-moz-user-select:none;-webkit-user-select:none;-ms-user-select:none;user-select:none;}
 </style>
 </head>
 <body>
-	<div id="emotion" unselectable="on">表情按钮</div>
+	<div id="emotion">表情按钮</div>
 	<div>
 		<span>测试文字</span>
 	</div>
@@ -87,7 +86,7 @@
 			};
 			ifr.onbeforedeactivate = function(){
 				me.updatebookmark();
-			}
+			};
 			ifr.onactivate = function(){
 				var selectionRange = me.bookmark, bookmark;
 				if(selectionRange && selectionRange.getBookmark){
@@ -99,10 +98,10 @@
 					range.select();
 					me.bookmark = null;
 				}
-			}
+			};
 			
 			//初始化完成后的回调
-			fn && fn.call(this, editor);
+			fn && fn.call(this, ifr);
 			return this;
 		},
 		updatebookmark: function(){
@@ -115,12 +114,6 @@
 				}
 			}else{
 				try {
-					//var sel = w.getSelection();
-					/*if(!isIEs){
-						this.bookmark = sel;
-					}else if(sel.getRangeAt && sel.rangeCount){
-						this.bookmark = sel.getRangeAt(0);
-					}*/
 					this.bookmark = w.getSelection().getRangeAt(0).cloneRange();
 				} catch (ex) {
 					/*this.focus();*/
@@ -138,19 +131,13 @@
 					ifrdoc.selection.createRange().pasteHTML(html);
 				}else if(isW3CRangeSupport){
 					// IE9 and non-IE
-					//IE9-11光标位置问题有待解决
 			        var sel = ifrwin.getSelection();
-			        /*if(!isIEs){
-			        	selectedRange = sel.getRangeAt(0);
-			        }*/
 			        
 			        if(sel.getRangeAt && sel.rangeCount){
-			        	//selectedRange = sel.getRangeAt(0);
-			        	console.log(lastRange.focusNode)
-			        	/*selectedRange.setEndPoint('EndToStart', lastRange);
-						selectedRange.collapse(false);
-						selectedRange.setEndPoint('EndToEnd', lastRange);
-						selectedRange.select();*/
+			        	if(!isIEs){
+				        	lastRange = sel.getRangeAt(0);
+				        }
+			        	
 			        	lastRange.deleteContents();
 			            var el = ifrdoc.createElement("div");
 			            el.innerHTML = html;
@@ -161,11 +148,11 @@
 			            }
 			            lastRange.insertNode(frag);
 			            if(lastNode){
-			                selectedRange = lastRange.cloneRange();
-			                selectedRange.setStartAfter(lastNode);
-			                selectedRange.collapse(true);
+			                lastRange = lastRange.cloneRange();
+			                lastRange.setStartAfter(lastNode);
+			                lastRange.collapse(true);
 			                sel.removeAllRanges();
-			                sel.addRange(selectedRange);
+			                sel.addRange(lastRange);
 			            }
 			        }
 				}
@@ -183,6 +170,34 @@
 			}
 			//链式调用直接返回
 			return this.updatebookmark();
+		},
+		html: function(){
+			var ifrwin = this.editor.contentWindow, ifrbody = ifrwin.document.body;
+			if(arguments.length){
+				ifrbody.innerHTML = '';
+				return this.insertHtmlAtCaret(arguments[0]);
+			}else{
+				return ifrbody.innerHTML;
+			}
+		},
+		text: function(){
+			var ifrwin = this.editor.contentWindow, ifrbody = ifrwin.document.body,
+				textAttr = 'innerText' in ifrbody ? 'innerText' : 'textContent';
+			if(arguments.length){
+				ifrbody.innerHTML = '';
+				var div = document.createElement('div');
+				div[textAttr] = arguments[0];
+				return this.insertHtmlAtCaret(div.innerHTML);
+			}else{
+				return ifrbody[textAttr];
+			}
+		},
+		destroy: function(){
+			var editor = this.editor;
+			editor.parentNode.removeChild(editor);
+			editor = null;
+			delete editor;
+			return;
 		}
 	};
 	
@@ -190,10 +205,14 @@
 })(window);
 
 window.onload = function(){
-	var editor = ssEditor('J_editor'), i = 0;
-	document.getElementById('emotion').onclick = function(){
-		editor.insertHtmlAtCaret(i++);
-	}
+	var i = 0, editor = ssEditor('J_editor', function(ifr){
+		var _this = this;
+		_this.text('<div style="background:#f00">123</div>');
+		document.getElementById('emotion').onclick = function(){
+			_this.insertHtmlAtCaret(i++);
+		}
+	});
+	alert(editor.text());
 }
 </script>
 	<div id="J_editor"></div></body>
