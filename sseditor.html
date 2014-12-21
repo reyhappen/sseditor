@@ -6,29 +6,36 @@
 </style>
 </head>
 <body>
-	<div id="emotion">表情按钮</div>
-	<div>
-		<span>测试文字</span>
-	</div>
-	
-	<div id="J_append">添加到后面去</div>
+	<div id="emotion">添加内容到已保存选区中</div>
+	<div id="J_editor"></div>
+	<div id="J_append">拖拽文本测试</div>
+	<div id="test" style="border:1px solid #f00;">测试复制数据</div>
+	<div>sadhjaskh<img src="../webui/css/img/diy/1_close.png" /></div>
 <script>
 (function(win){
-	var canplaceholder = 'placeholder' in document.createElement('input'),
+	var tmpInputel = document.createElement('input'), canplaceholder = 'placeholder' in tmpInputel,
 	isIEs = 'onbeforedeactivate' in document, isW3CRangeSupport = !!window.getSelection;
 	
-	var ssEditor = window.ssEditor = function(id, fn){
+	var ssEditor = win.ssEditor = function(id, fn){
 		return new ssEditor.prototype.init(id, fn);
 	}
+	//静态工具方法
+	ssEditor.trim = function(txt){
+		return txt.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '');
+	};
 	ssEditor.prototype = {
 		constructor: ssEditor,
 		init: function(id, fn){
-			var me = this, content = id.nodeType == 1 ? id : document.getElementById(id),
+			var me = this, //timestamp = +new Date(),
+				content = id.nodeType == 1 ? id : document.getElementById(id),
 				ifr = document.createElement('iframe'), ifrdoc;
 			this.editor = ifr;
 			
+			//ifr.id = 'J_sseditor'+timestamp;
+			ifr.width = '100%';
+			ifr.height = 200;
 			ifr.frameBorder = 0;
-			ifr.scrolling = 'no';
+			//ifr.scrolling = 'no';
 			var next = content.nextSibling, pnode = content.parentNode;
 			//避免选择节点是最后一个节点
 			if(next){
@@ -41,45 +48,37 @@
 			var ifrwin = ifr.contentWindow, ifrdoc = ifrwin.document;
 			ifrdoc.designMode = "on";
 			ifrdoc.open();
-			ifrdoc.write('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><style type="text/css">html,body{width:100%;height:100%;}body{font-family:"Microsoft YaHei", Arial, Helvetica, sans-serif;font-size:12px;background:#fff;border:0;padding:0;}</style></head><body></body></html>');
+			ifrdoc.write('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><style type="text/css">html,body{width:100%;height:100%;}body{font-family:"Microsoft YaHei", Arial, Helvetica, sans-serif;font-size:12px;background:#fff;border:0;padding:0;margin:0;word-wrap:break-word;word-break:break-all;line-height:1.2}div,p{margin:0;padding:0;}</style></head><body spellcheck="false" oncontrolselect="return false;"></body></html>');
 			ifrdoc.close();
 			var ifrbody = ifrdoc.body;
 			//ifrbody.contentEditable = true;
-			ifrbody.onpaste = function(e){
-				//var clipboardData = e.clipboardData || window.clipboardData;
-				//console.log(clipboardData.getData("text"));
-				
-				if(e.clipboardData){
-					//alert('e')
-					e.clipboardData.setData("text/plain", 'value');
-				}else if(window.clipboardData){
-					//alert('window')
-					window.clipboardData.setData("text", 'value');
-				}
-				return
-				var clipboardData = e.clipboardData, i = 0, items, item, types;
-				
-				if( clipboardData ){
-					items = clipboardData.items;
-					if(!items){
-						return;
-					}
-					console.log(items)
-					item = items[0];
-					types = clipboardData.types || [];
-					for( ; i < types.length; i++ ){
-						if( types[i] === 'Files' ){
-							item = items[i];
-							break;
-						}
-					}
-					if( item && item.kind === 'file' && item.type.match(/^image\//i) ){
-						//imgReader( item );
-					}
-				}
+			//以下几个函数专为粘贴事件过滤准备
+			ifrbody.oncontextmenu = function(e){
+				me.updatebookmark();
 			};
-			//ifrbody.oncontextmenu = function(e){  };
-			ifrbody.ondrop = function(){
+			//按键按下事件早于paste，按下时记下选区
+			ifrbody.onkeydown = function(e){
+				var ev = e || ifrwin.event;
+				if(ev.ctrlKey && ev.keyCode == 86){
+					me.updatebookmark();
+				}
+			}
+			//粘贴时获取选区，在选区中插入过滤后的字符，阻止浏览器粘贴的默认行为
+			ifrbody.onpaste = function(e){
+				var ev = e || ifrwin.event, clipboardData = ev.clipboardData || ifrwin.clipboardData,
+					data = ssEditor.trim(clipboardData.getData('text'));
+				if(data !== ''){
+					me.insertHtmlAtCaret(data.replace(/(<[^>]*>)/g,''));
+				}
+				return false;
+			};
+			ifrbody.ondrop = function(e){
+				var ev = e || ifrwin.event, dataTransfer = ev.dataTransfer,
+					data = ssEditor.trim(dataTransfer.getData('Text'));
+				//me.updatebookmark();
+				if(data !== ''){
+					me.insertHtmlAtCaret(data.replace(/(<[^>]*>)/g,''));
+				}
 				return false;
 				//maybe filter by http://www.bitscn.com/school/Javascript/201408/308356.html
 				//http://www.it165.net/design/html/201402/2506.html
@@ -87,7 +86,7 @@
 			ifr.onbeforedeactivate = function(){
 				me.updatebookmark();
 			};
-			ifr.onactivate = function(){
+			/*ifr.onactivate = function(){
 				var selectionRange = me.bookmark, bookmark;
 				if(selectionRange && selectionRange.getBookmark){
 					bookmark = selectionRange.getBookmark();
@@ -98,7 +97,7 @@
 					range.select();
 					me.bookmark = null;
 				}
-			};
+			};*/
 			
 			//初始化完成后的回调
 			fn && fn.call(this, ifr);
@@ -127,13 +126,20 @@
 			ifrwin.focus();
 			if(lastRange){
 				if(lastRange && lastRange.text != undefined){
-					//lastRange.pasteHTML(html);
-					ifrdoc.selection.createRange().pasteHTML(html);
+					//IE6-8必须是先获取上次保存range，再创建新range之后进行移动
+					lastRange = lastRange.getBookmark();
+					
+					var range = ifrdoc.selection.createRange();
+						range.moveToBookmark(lastRange);
+						range.select();
+						this.bookmark = null;
+					range.pasteHTML(html);
 				}else if(isW3CRangeSupport){
-					// IE9 and non-IE
+					// IE9-11 and non-IE
 			        var sel = ifrwin.getSelection();
 			        
 			        if(sel.getRangeAt && sel.rangeCount){
+			        	//IE9-11必须获取上次保存的range对象来进行操作,非IE必须重新获取一次新的
 			        	if(!isIEs){
 				        	lastRange = sel.getRangeAt(0);
 				        }
@@ -143,11 +149,12 @@
 			            el.innerHTML = html;
 			            var frag = ifrdoc.createDocumentFragment(),
 			                node, lastNode;
-			            while((node = el.firstChild)){
+			            while(node = el.firstChild){
 			                lastNode = frag.appendChild(node);
 			            }
 			            lastRange.insertNode(frag);
 			            if(lastNode){
+			            	//必须使用clone的range
 			                lastRange = lastRange.cloneRange();
 			                lastRange.setStartAfter(lastNode);
 			                lastRange.collapse(true);
@@ -171,10 +178,27 @@
 			//链式调用直接返回
 			return this.updatebookmark();
 		},
+		filter: function(){
+			//过滤方法，最终返回剔除多余标签后的html
+		},
+		getRange: function(){
+			
+		},
+		focus: function(){
+			var lastRange = this.bookmark, ifrwin = this.editor.contentWindow//,
+				//ifrdoc = ifrwin.document, ifrbody = ifrdoc.body;
+			ifrwin.focus();
+			//获取已选光标位置区域
+			/*if(lastRange){
+				
+			}*/
+			//重新部署光标区域
+		},
 		html: function(){
 			var ifrwin = this.editor.contentWindow, ifrbody = ifrwin.document.body;
 			if(arguments.length){
 				ifrbody.innerHTML = '';
+				//也许要加过滤方法，去除多余的不需要的标签，只保留文本与表情
 				return this.insertHtmlAtCaret(arguments[0]);
 			}else{
 				return ifrbody.innerHTML;
@@ -202,18 +226,20 @@
 	};
 	
 	ssEditor.prototype.init.prototype = ssEditor.prototype;
-})(window);
+})(this);//this对于宿主环境适应性更强
 
-window.onload = function(){
-	var i = 0, editor = ssEditor('J_editor', function(ifr){
-		var _this = this;
-		_this.text('<div style="background:#f00">123</div>');
-		document.getElementById('emotion').onclick = function(){
-			_this.insertHtmlAtCaret(i++);
-		}
-	});
-	alert(editor.text());
-}
+
+/*******************测试区******************/
+
+var i = 0, editor = ssEditor('J_editor', function(ifr){
+	var _this = this;
+	_this.text('<div style="background:#f00">123</div>');
+	document.getElementById('emotion').onclick = function(){
+		_this.insertHtmlAtCaret(i++);
+	}
+});
+//alert(editor.text());
+//editor.destroy();
 </script>
-	<div id="J_editor"></div></body>
+</body>
 </html>
