@@ -1,6 +1,7 @@
-<html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-<meta charset="UTF-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <title>说说编辑器</title>
 <style type="text/css">
 </style>
@@ -17,17 +18,84 @@
 	isIEs = 'onbeforedeactivate' in document, isW3CRangeSupport = !!window.getSelection;
 	
 	var ssEditor = win.ssEditor = function(id, fn){
-		return new ssEditor.prototype.init(id, fn);
-	}
+			return new ssEditor.prototype.init(id, fn);
+		}, getType = Object.prototype.toString, rmultiBrs = /(<br[^>]*>[\s\uFEFF\xA0]*)+/gi,
+		rtags = /(<[^>]*>)/g, rnotBrEmotion = /<(?!br|\/?img[^<>]*class="?J_emotion"?)[^<>]*>/gi;
 	//静态工具方法
 	ssEditor.trim = function(txt){
 		return txt.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '');
 	};
+	ssEditor.extend = function(destination, source){
+		for(var property in source){
+			destination[property] = source[property];
+		}
+		return destination;
+	};
+	
+	/*
+	 * ssEditor({
+	 * 		'target': 'DOMid' | DOM element[,
+	 * 		'onReady': function(ifr){
+	 * 			this-->ssEditor
+	 * 			ifr -->editable iframe element in ssEditor, 
+	 * 					you can get the window of iframe using ifr.contentWindow.
+	 * 		}],
+	 * 		'cssRules': 'body{line-height:1.5}', //css rules of the contents in the editor.
+	 * 		'filter':function(html, event){
+	 * 			//must return a string. Otherwise it will insert 'undefined' into the editor.
+	 * 			return html.replace(/(<[^>]*>)/g,'');
+	 * 		}
+	 * });
+	 * ssEditor({
+	 * 		'target': t[,
+	 * 		'cssRules': '',
+	 * 		'filter': filterFn]
+	 * }, function(){
+	 * 		//just like 'onReady' above
+	 * });
+	 * ssEditor('id'[, function(ifr){
+	 * 		//just like 'onReady' above
+	 * }]);
+	 * */
 	ssEditor.prototype = {
 		constructor: ssEditor,
 		init: function(id, fn){
+			if(!id) throw new Error('请为编辑器传入参数');
+			var content, idType = getType.call(id), onReady, cssRules, filter;
+			//方法重载判断
+			if(idType === '[object String]'){
+				//id为字符串
+				content = document.getElementById(id);
+			}else if(id.nodeType == 1){
+				//id为DOM节点
+				content = id;
+			}else if(idType === '[object Object]'){
+				//id为json对象
+				var target = id.target;
+				onReady = id.onReady;
+				cssRules = id.cssRules;
+				filter = id.filter;
+				if(target){
+					content = target.nodeType == 1 ? target : document.getElementById(target);
+				}else{
+					throw new Error('请为编辑器传入要生成编辑器的元素节点或id');
+				}
+			}
+			if(fn){
+				if(getType.call(fn) === '[object Function]'){
+					onReady = fn;
+				}else if(getType.call(fn) === '[object Object]'){
+					onReady = fn.onReady;
+					cssRules = fn.cssRules;
+					filter = fn.filter;
+				}
+			}
+			
+			filter = filter || function(html, e){
+				return html.replace(rtags, '');
+			};
+			
 			var me = this, //timestamp = +new Date(),
-				content = id.nodeType == 1 ? id : document.getElementById(id),
 				ifr = document.createElement('iframe'), ifrdoc;
 			this.editor = ifr;
 			
@@ -48,7 +116,7 @@
 			var ifrwin = ifr.contentWindow, ifrdoc = ifrwin.document;
 			ifrdoc.designMode = "on";
 			ifrdoc.open();
-			ifrdoc.write('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><style type="text/css">html,body{width:100%;height:100%;}body{font-family:"Microsoft YaHei", Arial, Helvetica, sans-serif;font-size:12px;background:#fff;border:0;padding:0;margin:0;word-wrap:break-word;word-break:break-all;line-height:1.2}div,p{margin:0;padding:0;}</style></head><body spellcheck="false" oncontrolselect="return false;"></body></html>');
+			ifrdoc.write('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><style type="text/css">html,body{width:100%;height:100%;}body{font-family:"Microsoft YaHei", Arial, Helvetica, sans-serif;font-size:12px;background:#fff;border:0;padding:0;margin:0;word-wrap:break-word;word-break:break-all;line-height:1.2}div,p{margin:0;padding:0;}'+ (cssRules || '') +'</style></head><body spellcheck="false" oncontrolselect="return false;"></body></html>');
 			ifrdoc.close();
 			var ifrbody = ifrdoc.body;
 			//ifrbody.contentEditable = true;
@@ -67,19 +135,28 @@
 			ifrbody.onpaste = function(e){
 				var ev = e || ifrwin.event, clipboardData = ev.clipboardData || ifrwin.clipboardData,
 					data = ssEditor.trim(clipboardData.getData('text'));
+				//若用户取消了访问剪贴板的权限，则data就是空字符串
 				if(data !== ''){
-					me.insertHtmlAtCaret(data.replace(/(<[^>]*>)/g,''));
+					//过滤html标签，最好的方案是保留需要的标签比如表情图片
+					me.insertHtmlAtCaret(String(filter(data, e)) || '');
 				}
 				return false;
 			};
 			ifrbody.ondrop = function(e){
 				var ev = e || ifrwin.event, dataTransfer = ev.dataTransfer,
 					data = ssEditor.trim(dataTransfer.getData('Text'));
-				//me.updatebookmark();
-				if(data !== ''){
-					me.insertHtmlAtCaret(data.replace(/(<[^>]*>)/g,''));
+				if(isIEs){
+					me.updatebookmark();
+					//谷歌火狐光标位置和插入的内容不正确
+					if(data !== ''){
+						me.insertHtmlAtCaret(String(filter(data, e)) || '');
+					}
+					return false;
+				}else{
+					alert(ifrwin.dataTransfer)
+					//dataTransfer.setData('text/plain', data);
 				}
-				return false;
+				
 				//maybe filter by http://www.bitscn.com/school/Javascript/201408/308356.html
 				//http://www.it165.net/design/html/201402/2506.html
 			};
@@ -100,7 +177,7 @@
 			};*/
 			
 			//初始化完成后的回调
-			fn && fn.call(this, ifr);
+			onReady && onReady.call(this, ifr);
 			return this;
 		},
 		updatebookmark: function(){
@@ -108,13 +185,13 @@
 			if(!isW3CRangeSupport){
 				try {
 					this.bookmark = w.document.selection.createRange();
-				} catch (ex) {
+				}catch (ex){
 					
 				}
 			}else{
-				try {
+				try{
 					this.bookmark = w.getSelection().getRangeAt(0).cloneRange();
-				} catch (ex) {
+				}catch (ex){
 					/*this.focus();*/
 				}
 			}
@@ -143,7 +220,7 @@
 			        	if(!isIEs){
 				        	lastRange = sel.getRangeAt(0);
 				        }
-			        	
+			        	console.log(lastRange)
 			        	lastRange.deleteContents();
 			            var el = ifrdoc.createElement("div");
 			            el.innerHTML = html;
@@ -177,9 +254,6 @@
 			}
 			//链式调用直接返回
 			return this.updatebookmark();
-		},
-		filter: function(){
-			//过滤方法，最终返回剔除多余标签后的html
 		},
 		getRange: function(){
 			
@@ -225,19 +299,52 @@
 		}
 	};
 	
+	
+	//去除不必要标签
+	function stripUselessTag(html){
+		return html.replace(rnotBrEmotion, '').replace(rmultiBrs, '<br />');
+	}
+	
+	//获取纯文本内容与图片
+	function editorHTMLLen(html){
+		//一个表情以两个字符长度计算
+		return stripUselessTag(html).replace(rtags, function($0, $1){
+			if(/<img[^<>]*class="?J_emotion"?[^>]*>/gi.test($1)){
+				return '--';
+			}else if(rmultiBrs.test($1)){
+	        	return '';
+	        }
+		}).length;
+	}
 	ssEditor.prototype.init.prototype = ssEditor.prototype;
 })(this);//this对于宿主环境适应性更强
 
 
 /*******************测试区******************/
 
-var i = 0, editor = ssEditor('J_editor', function(ifr){
+var i = 0, editor = ssEditor('J_editor', {
+	//'target': document.getElementById('J_editor'),
+	'onReady': function(ifr){
+		console.log(this, ifr);
+		var _this = this;
+		_this.text('<div style="background:#f00">123</div>');
+		document.getElementById('emotion').onclick = function(){
+			_this.insertHtmlAtCaret(i++);
+		}
+	},
+	//cssRules: 'body{background:#ff0;}',
+	filter: function(html, e){
+		//console.log(html, e);
+		return html;
+	}
+});
+/*function(ifr){
 	var _this = this;
 	_this.text('<div style="background:#f00">123</div>');
 	document.getElementById('emotion').onclick = function(){
 		_this.insertHtmlAtCaret(i++);
 	}
-});
+}*/
 //alert(editor.text());
 //editor.destroy();
 </script>
