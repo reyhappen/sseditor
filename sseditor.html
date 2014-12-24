@@ -7,6 +7,8 @@
 </style>
 </head>
 <body>
+	<a href="javascript:;" id="a">添加内容到已保存选区中</a>
+	<input id="btn" type="button" value="添加内容到已保存选区中" />
 	<div id="emotion">添加内容到已保存选区中</div>
 	<div id="J_editor"></div>
 	<div id="J_append">拖拽文本测试</div>
@@ -15,12 +17,16 @@
 <script>
 (function(win){
 	var tmpInputel = document.createElement('input'), canplaceholder = 'placeholder' in tmpInputel,
-	isIEs = 'onbeforedeactivate' in document, isW3CRangeSupport = !!window.getSelection;
+		isIEs = 'onbeforedeactivate' in document, isW3CRangeSupport = !!window.getSelection,
+		tmpDiv = document.createElement('div'),
+		textAttr = 'innerText' in tmpDiv ? 'innerText' : 'textContent',
+		d = +new Date(), rtags = /(<[^>]*>)/g,
+		rnotBrEmotion = new RegExp('<(?!br|\/?img[^<>]*class="?J_emotion'+ d +'"?)[^<>]*>', 'gi')
+		rmultiBrs = /(<br[^>]*>[\s\uFEFF\xA0]*)+/gi;
 	
 	var ssEditor = win.ssEditor = function(id, fn){
 			return new ssEditor.prototype.init(id, fn);
-		}, getType = Object.prototype.toString, rmultiBrs = /(<br[^>]*>[\s\uFEFF\xA0]*)+/gi,
-		rtags = /(<[^>]*>)/g, rnotBrEmotion = /<(?!br|\/?img[^<>]*class="?J_emotion"?)[^<>]*>/gi;
+		}, getType = Object.prototype.toString;
 	//静态工具方法
 	ssEditor.trim = function(txt){
 		return txt.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '');
@@ -31,6 +37,22 @@
 		}
 		return destination;
 	};
+	//去除不必要标签
+	ssEditor.stripUselessTag = function(html){
+		return html.replace(rnotBrEmotion, '').replace(rmultiBrs, '<br />');
+	}
+	
+	//获取纯文本内容与图片
+	function editorHTMLLen(html){
+		//一个表情以两个字符长度计算
+		return stripUselessTag(html).replace(rtags, function($0, $1){
+			if(/<img[^<>]*class="?J_emotion"?[^>]*>/gi.test($1)){
+				return '--';
+			}else if(rmultiBrs.test($1)){
+	        	return '';
+	        }
+		}).length;
+	}
 	
 	/*
 	 * ssEditor({
@@ -41,7 +63,7 @@
 	 * 					you can get the window of iframe using ifr.contentWindow.
 	 * 		}],
 	 * 		'cssRules': 'body{line-height:1.5}', //css rules of the contents in the editor.
-	 * 		'filter':function(html, event){
+	 * 		'filter':function(html){
 	 * 			//must return a string. Otherwise it will insert 'undefined' into the editor.
 	 * 			return html.replace(/(<[^>]*>)/g,'');
 	 * 		}
@@ -61,7 +83,9 @@
 		constructor: ssEditor,
 		init: function(id, fn){
 			if(!id) throw new Error('请为编辑器传入参数');
-			var content, idType = getType.call(id), onReady, cssRules, filter;
+			var idType = getType.call(id), content, onReady, cssRules, filter;
+				//rnotBrEmotion = /<(?!br|\/?img[^<>]*class="?J_emotion"?)[^<>]*>/gi;
+			
 			//方法重载判断
 			if(idType === '[object String]'){
 				//id为字符串
@@ -90,10 +114,6 @@
 					filter = fn.filter;
 				}
 			}
-			
-			filter = filter || function(html, e){
-				return html.replace(rtags, '');
-			};
 			
 			var me = this, //timestamp = +new Date(),
 				ifr = document.createElement('iframe'), ifrdoc;
@@ -127,6 +147,7 @@
 			//按键按下事件早于paste，按下时记下选区
 			ifrbody.onkeydown = function(e){
 				var ev = e || ifrwin.event;
+				//快捷键粘贴
 				if(ev.ctrlKey && ev.keyCode == 86){
 					me.updatebookmark();
 				}
@@ -137,28 +158,24 @@
 					data = ssEditor.trim(clipboardData.getData('text'));
 				//若用户取消了访问剪贴板的权限，则data就是空字符串
 				if(data !== ''){
-					//过滤html标签，最好的方案是保留需要的标签比如表情图片
-					me.insertHtmlAtCaret(String(filter(data, e)) || '');
+					tmpDiv[textAttr] = data;
+					me.insertHtmlAtCaret(tmpDiv.innerHTML || '');
+					//me.insertHtmlAtCaret(ssEditor.stripUselessTag(data) || '');
 				}
 				return false;
 			};
 			ifrbody.ondrop = function(e){
 				var ev = e || ifrwin.event, dataTransfer = ev.dataTransfer,
 					data = ssEditor.trim(dataTransfer.getData('Text'));
+				me.updatebookmark();
+				//谷歌火狐光标位置和插入的内容不正确
 				if(isIEs){
-					me.updatebookmark();
-					//谷歌火狐光标位置和插入的内容不正确
 					if(data !== ''){
-						me.insertHtmlAtCaret(String(filter(data, e)) || '');
+						tmpDiv[textAttr] = data;
+						me.insertHtmlAtCaret(tmpDiv.innerHTML || '');
 					}
-					return false;
-				}else{
-					alert(ifrwin.dataTransfer)
-					//dataTransfer.setData('text/plain', data);
 				}
-				
-				//maybe filter by http://www.bitscn.com/school/Javascript/201408/308356.html
-				//http://www.it165.net/design/html/201402/2506.html
+				return false;
 			};
 			ifr.onbeforedeactivate = function(){
 				me.updatebookmark();
@@ -202,7 +219,7 @@
 				ifrdoc = ifrwin.document, ifrbody = ifrdoc.body;
 			ifrwin.focus();
 			if(lastRange){
-				if(lastRange && lastRange.text != undefined){
+				if(lastRange.getBookmark){
 					//IE6-8必须是先获取上次保存range，再创建新range之后进行移动
 					lastRange = lastRange.getBookmark();
 					
@@ -220,12 +237,11 @@
 			        	if(!isIEs){
 				        	lastRange = sel.getRangeAt(0);
 				        }
-			        	console.log(lastRange)
 			        	lastRange.deleteContents();
 			            var el = ifrdoc.createElement("div");
 			            el.innerHTML = html;
 			            var frag = ifrdoc.createDocumentFragment(),
-			                node, lastNode;
+			            	node, lastNode;
 			            while(node = el.firstChild){
 			                lastNode = frag.appendChild(node);
 			            }
@@ -243,13 +259,14 @@
 			}else{
 				ifrbody.innerHTML += html;
 				if(isW3CRangeSupport){
-					var sel = ifrwin.getSelection();
-					selectedRange = sel.getRangeAt(0);
-					selectedRange = selectedRange.cloneRange();
-	                selectedRange.setStartAfter(ifrbody.lastChild);
-	                selectedRange.collapse(true);
-	                sel.removeAllRanges();
-	                sel.addRange(selectedRange);
+					try{
+						var sel = ifrwin.getSelection(), selectedRange = sel.getRangeAt(0);
+						selectedRange = selectedRange.cloneRange();
+		                selectedRange.setStartAfter(ifrbody.lastChild);
+		                selectedRange.collapse(true);
+		                sel.removeAllRanges();
+		                sel.addRange(selectedRange);
+					}catch(e){  }
 				}
 			}
 			//链式调用直接返回
@@ -257,6 +274,10 @@
 		},
 		getRange: function(){
 			
+			return {
+				startOffset: 1,
+				endOffset: 1
+			}
 		},
 		focus: function(){
 			var lastRange = this.bookmark, ifrwin = this.editor.contentWindow//,
@@ -299,23 +320,6 @@
 		}
 	};
 	
-	
-	//去除不必要标签
-	function stripUselessTag(html){
-		return html.replace(rnotBrEmotion, '').replace(rmultiBrs, '<br />');
-	}
-	
-	//获取纯文本内容与图片
-	function editorHTMLLen(html){
-		//一个表情以两个字符长度计算
-		return stripUselessTag(html).replace(rtags, function($0, $1){
-			if(/<img[^<>]*class="?J_emotion"?[^>]*>/gi.test($1)){
-				return '--';
-			}else if(rmultiBrs.test($1)){
-	        	return '';
-	        }
-		}).length;
-	}
 	ssEditor.prototype.init.prototype = ssEditor.prototype;
 })(this);//this对于宿主环境适应性更强
 
@@ -325,18 +329,22 @@
 var i = 0, editor = ssEditor('J_editor', {
 	//'target': document.getElementById('J_editor'),
 	'onReady': function(ifr){
-		console.log(this, ifr);
+		//console.log(this, ifr);
 		var _this = this;
 		_this.text('<div style="background:#f00">123</div>');
+		document.getElementById('btn').onclick = 
+		document.getElementById('a').onclick = 
 		document.getElementById('emotion').onclick = function(){
 			_this.insertHtmlAtCaret(i++);
 		}
-	},
+	}/*,
 	//cssRules: 'body{background:#ff0;}',
-	filter: function(html, e){
-		//console.log(html, e);
-		return html;
-	}
+	filter: function(html){
+		return html.replace(/[<>]/gi, function($0, $1){
+			return 
+			//console.log(arguments, $0, $1)
+		});
+	}*/
 });
 /*function(ifr){
 	var _this = this;
@@ -347,6 +355,23 @@ var i = 0, editor = ssEditor('J_editor', {
 }*/
 //alert(editor.text());
 //editor.destroy();
+
+
+(function(win){
+	//alert(document.body.clientHeight)
+	try{
+		var p = win.parent, ifrs = p.document.getElementsByTagName('iframe');
+		for(var i=0, il=ifrs.length; i<il; i++){
+			var ifr = ifrs[i];
+			if(ifr.contentWindow == win){
+				ifr.style.height = ifr.height = win.document.body.scrollHeight;
+				break;
+			}
+		}
+	}catch(e){
+		
+	}
+})(this);
 </script>
 </body>
 </html>
