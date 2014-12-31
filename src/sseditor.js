@@ -31,6 +31,26 @@
  * ssEditor('id'[, function(ifr){
  * 		//just like 'onReady' above
  * }]);
+ * ssEditor('id'[, {
+ * 		'cssRules': '',
+ * 		'defaultContents': '编辑器默认内容',
+ * 		'onChange': filterFn
+ * }]);
+ * 
+ * public properties:
+ * 		this.editor		 --> ifr
+ * 		this.sscontLenth --> shuoshuo content length(an img is 2 characters)
+ * public fns:
+ * 		this.html(), //like jquery
+ * 		this.text(), //like jquery
+ * 		this.focus(), //focus in iframe body
+ * 		this.updatebookmark() //update the range and save it
+ * 		this.destroy() //remove the iframe，set the editor to be undefined
+ * 
+ * static fns:
+ * 		ssEditor.trim() //like jquery
+ * 		ssEditor.extend() //simple extend like jquery
+ * 		ssEditor.stripUselessTag() //strip useless tags
  * */
 
 (function(win){

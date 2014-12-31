@@ -21,12 +21,13 @@ body{font-size: 12px;}
 <script type="text/javascript" src="../src/sseditor.js"></script>
 <script>
 var i = 0, editor = ssEditor('J_editor', {
+	//'defaultContents': '123',
 	'onReady': function(ifr){
 		//console.log(this, ifr);
 		var _this = this, ifrwin = ifr.contentWindow,
 			ifrdoc = ifrwin.document, ifrbody = ifrdoc.body;
 		//_this.text('<div style="background:#f00">123</div>');
-		ifrbody.innerHTML = '<span contenteditable="false">to:cao</span>asda<img src="images/1_close.png" title="123" />';
+		//ifrbody.innerHTML = '<span contenteditable="false">to:cao</span>asda<img src="images/1_close.png" title="123" />';
 		_this.focus();
 		$id('btn').onclick = 
 		$id('a').onclick = 
@@ -34,7 +35,7 @@ var i = 0, editor = ssEditor('J_editor', {
 			_this.insertHtmlAtCaret(i++);
 		}
 		$id('test').onclick = function(){
-			//console.log(_this.getRange());
+			console.log(_this.sscontLenth);
 		}
 	},
 	cssRules: 'body span{background:#ff0;}',
