@@ -45,6 +45,7 @@
  * 		this.text(), //like jquery
  * 		this.focus(), //focus in iframe body
  * 		this.updatebookmark() //update the range and save it
+ * 		this.insertHtmlAtCaret(html) //insert html into editor
  * 		this.destroy() //remove the iframe，set the editor to be undefined
  * 
  * static fns:
@@ -63,6 +64,7 @@
 		d = +new Date(), //用于表情等的标记
 		rtags = /(<[^>]*>)/g, //用于过滤标签
 		rmultiBrs = /(<br[^>]*>[\s\uFEFF\xA0]*)+/gi, //多个换行
+		rnewlinereturn = /\r|\n/g, //回车换行
 		remotions = new RegExp('<img[^<>]*class="?J_emotion'+ d +'"?[^>]*>', 'gi'), //表情
 		rnotBrEmotion = new RegExp('<(?!br|\/?img[^<>]*class="?J_emotion'+ d +'"?)[^<>]*>', 'gi'), //非换行和表情，用于过滤不必要标签
 		defaultOptions = { //参数默认设置
@@ -92,13 +94,15 @@
 	//去除不必要标签
 	ssEditor.stripUselessTag = function(html){
 		//去除非br和表情的标签，合并多个换行为一个
-		return html.replace(rnotBrEmotion, '').replace(rmultiBrs, '<br />');
+		return html.replace(rnotBrEmotion, '').replace(rmultiBrs, '<br />').replace(/<br[^>]*>$/,'').replace(/^(&nbsp;)+|($1)+$/, '').replace(/width="?\d+"?|height="?\d+"?/g, '');
 	}
+	
+	//为外部插件设置相关属性提供唯一性
+	ssEditor.timeStamp = d;
 	
 	/*
 	 * 在对象实例上的非原型上的方法为特权方法this.fn()
 	 * prototype原型上的方法为公有方法
-	 * 也可以放在
 	 */
 	
 	//私有方法
@@ -109,10 +113,14 @@
 		}
 	}
 	function triggerInput(ifrdoc){
+		var cevent;
 		if(!isIEs){
-			var cevent = ifrdoc.createEvent('HTMLEvents');
+			cevent = ifrdoc.createEvent('HTMLEvents');
 			cevent.initEvent('input', false, true);
 			ifrdoc.body.dispatchEvent(cevent);
+		}else if(!isW3CRangeSupport){
+			cevent = ifrdoc.createEventObject();
+			ifrdoc.body.fireEvent('onkeyup',cevent);
 		}
 	}
 	
@@ -159,6 +167,9 @@
 				ifr = document.createElement('iframe'), ifrdoc;
 			me.editor = ifr; //在实例上注册私有属性，将编辑区域iframe保存起来
 			
+			if('querySelector' in document){
+				ifr.scrolling = 'no';
+			}
 			ifr.width = '100%';
 			ifr.height = 200; //嫌不爽可以用css直接控制
 			ifr.frameBorder = 0;
@@ -179,14 +190,14 @@
 				ifrdoc = ifrwin.document; //获取iframe的document
 			ifrdoc.designMode = "on"; //设置可编辑状态
 			ifrdoc.open(); //打开文档流
-			ifrdoc.write('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><style type="text/css">html,body{width:100%;height:100%;}body{font-family:"Microsoft YaHei",Arial,Helvetica,sans-serif;font-size:12px;background:#fff;border:0;padding:0;margin:0;word-wrap:break-word;word-break:break-all;line-height:1.2}div,p{margin:0;padding:0;}'+ opt.cssRules +'</style></head><body spellcheck="false" oncontrolselect="return false;">'+ opt.defaultContents +'</body></html>'); //文档写入内容
+			ifrdoc.write('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><style type="text/css">html,body{overflow-y:auto;width:100%;height:100%;}body{font-family:"Microsoft YaHei",Arial,Helvetica,sans-serif;font-size:12px;background:#fff;border:0;padding:0;margin:0;word-wrap:break-word;word-break:break-all;line-height:1.5}div,p{margin:0;padding:0;}'+ opt.cssRules +'</style></head><body spellcheck="false" oncontrolselect="return false;">'+ opt.defaultContents +'</body></html>'); //文档写入内容
 			ifrdoc.close(); //关闭文档流
 			
 			var ifrbody = ifrdoc.body, //获取body
 				handler = function(e){
 					var ev = ifrwin.event || e;
 					//绑定的事件有：input(ff,chrome), textinput(IE9-11), selectionchange(IE6-11), keyup(IE6-8)
-					me.sscontLenth = me.text().length + ifrbody.getElementsByTagName('img').length*2;
+					me.sscontLenth = me.text().replace(rnewlinereturn, '').length + ifrbody.getElementsByTagName('img').length*2;
 					onChange && onChange.apply(me, [ev, me.sscontLenth]);
 				}
 			
@@ -368,6 +379,9 @@
 			}else{
 				return ifrbody[textAttr];
 			}
+		},
+		ssContents: function(){
+			return ssEditor.stripUselessTag(this.html());
 		},
 		destroy: function(){
 			var editor = this.editor;
