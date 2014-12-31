@@ -1,0 +1,58 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>说说编辑器</title>
+<style type="text/css">
+body{font-size: 12px;}
+.metionuser{background:none;}
+</style>
+</head>
+<body>
+	<img class="metionuser" alt="123" />
+	<a href="javascript:;" id="a">添加内容到已保存选区中</a>
+	<input id="btn" type="button" value="添加内容到已保存选区中" />
+	<div id="emotion">添加内容到已保存选区中</div>
+	<div id="J_editor"></div>
+	<div id="J_append">拖拽文本测试</div>
+	<div id="test" style="border:1px solid #f00;">测试复制数据</div>
+	<div>sadhjaskh<img src="images/1_close.png" /></div>
+	
+<script type="text/javascript" src="../src/sseditor.js"></script>
+<script>
+var i = 0, editor = ssEditor('J_editor', {
+	'onReady': function(ifr){
+		//console.log(this, ifr);
+		var _this = this, ifrwin = ifr.contentWindow,
+			ifrdoc = ifrwin.document, ifrbody = ifrdoc.body;
+		//_this.text('<div style="background:#f00">123</div>');
+		ifrbody.innerHTML = '<span contenteditable="false">to:cao</span>asda<img src="images/1_close.png" title="123" />';
+		_this.focus();
+		$id('btn').onclick = 
+		$id('a').onclick = 
+		$id('emotion').onclick = function(){
+			_this.insertHtmlAtCaret(i++);
+		}
+		$id('test').onclick = function(){
+			//console.log(_this.getRange());
+		}
+	},
+	cssRules: 'body span{background:#ff0;}',
+	onChange: function(e, l){
+		log(e, l, this.sscontLenth)
+	}
+});
+
+function $id(id){
+	return document.getElementById(id);
+}
+function log(){
+	if(window.console){
+		console.log(Array.prototype.slice.apply(arguments, [0]))
+	}else{
+		window.status = Array.prototype.slice.apply(arguments, [0]);
+	}
+}
+</script>
+</body>
+</html>

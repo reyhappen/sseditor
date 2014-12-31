@@ -16,27 +16,19 @@
 	<div>sadhjaskh<img src="../webui/css/img/diy/1_close.png" /></div>
 <script>
 (function(win){
-	var tmpInputel = document.createElement('input'),
-		canplaceholder = 'placeholder' in tmpInputel, //IE10-11, non IE
-		isIEs = 'onbeforedeactivate' in document, //non IE
-		isW3CRangeSupport = !!window.getSelection, //w3c
-		tmpDiv = document.createElement('div'), //临时用途的div
+	var tmpInputel = document.createElement('input'), canplaceholder = 'placeholder' in tmpInputel,
+		isIEs = 'onbeforedeactivate' in document, isW3CRangeSupport = !!window.getSelection,
+		tmpDiv = document.createElement('div'),
 		textAttr = 'innerText' in tmpDiv ? 'innerText' : 'textContent',
-		d = +new Date(), rtags = /(<[^>]*>)/g, rmultiBrs = /(<br[^>]*>[\s\uFEFF\xA0]*)+/gi,
-		remotions = new RegExp('<img[^<>]*class="?J_emotion'+ d +'"?[^>]*>', 'gi'),
-		rnotBrEmotion = new RegExp('<(?!br|\/?img[^<>]*class="?J_emotion'+ d +'"?)[^<>]*>', 'gi'),
-		defaultOptions = {
-			onReady: null,
-			cssRules: '',
-			onChange: null
-		};
+		d = +new Date(), rtags = /(<[^>]*>)/g,
+		rnotBrEmotion = new RegExp('<(?!br|\/?img[^<>]*class="?J_emotion'+ d +'"?)[^<>]*>', 'gi')
+		rmultiBrs = /(<br[^>]*>[\s\uFEFF\xA0]*)+/gi;
 	
 	var ssEditor = win.ssEditor = function(id, fn){
 			return new ssEditor.prototype.init(id, fn);
 		}, getType = Object.prototype.toString;
 	//静态工具方法
 	ssEditor.trim = function(txt){
-		//\u3000
 		return txt.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '');
 	};
 	ssEditor.extend = function(destination, source){
@@ -54,19 +46,12 @@
 	function editorHTMLLen(html){
 		//一个表情以两个字符长度计算
 		return stripUselessTag(html).replace(rtags, function($0, $1){
-			if(remotions.test($1)){
+			if(/<img[^<>]*class="?J_emotion"?[^>]*>/gi.test($1)){
 				return '--';
 			}else if(rmultiBrs.test($1)){
 	        	return '';
 	        }
 		}).length;
-	}
-	
-	function setDataTransfer(data, editor){
-		if(data !== ''){
-			tmpDiv[textAttr] = data;
-			editor.insertHtmlAtCaret(tmpDiv.innerHTML.replace(rmultiBrs, '<br />') || '');
-		}
 	}
 	
 	/*
@@ -78,14 +63,15 @@
 	 * 					you can get the window of iframe using ifr.contentWindow.
 	 * 		}],
 	 * 		'cssRules': 'body{line-height:1.5}', //css rules of the contents in the editor.
-	 * 		'onChange': function(html){
-	 * 			
+	 * 		'filter':function(html){
+	 * 			//must return a string. Otherwise it will insert 'undefined' into the editor.
+	 * 			return html.replace(/(<[^>]*>)/g,'');
 	 * 		}
 	 * });
 	 * ssEditor({
 	 * 		'target': t[,
 	 * 		'cssRules': '',
-	 * 		'onChange': filterFn]
+	 * 		'filter': filterFn]
 	 * }, function(){
 	 * 		//just like 'onReady' above
 	 * });
@@ -97,7 +83,7 @@
 		constructor: ssEditor,
 		init: function(id, fn){
 			if(!id) throw new Error('请为编辑器传入参数');
-			var idType = getType.call(id), opt, content, onReady, cssRules;
+			var idType = getType.call(id), content, onReady, cssRules, filter;
 				//rnotBrEmotion = /<(?!br|\/?img[^<>]*class="?J_emotion"?)[^<>]*>/gi;
 			
 			//方法重载判断
@@ -108,9 +94,11 @@
 				//id为DOM节点
 				content = id;
 			}else if(idType === '[object Object]'){
-				opt = ssEditor.extend(defaultOptions, id);
 				//id为json对象
 				var target = id.target;
+				onReady = id.onReady;
+				cssRules = id.cssRules;
+				filter = id.filter;
 				if(target){
 					content = target.nodeType == 1 ? target : document.getElementById(target);
 				}else{
@@ -121,13 +109,11 @@
 				if(getType.call(fn) === '[object Function]'){
 					onReady = fn;
 				}else if(getType.call(fn) === '[object Object]'){
-					opt = ssEditor.extend(defaultOptions, fn);
+					onReady = fn.onReady;
+					cssRules = fn.cssRules;
+					filter = fn.filter;
 				}
 			}
-			
-			onReady = opt.onReady;
-			cssRules = opt.cssRules;
-			onChange = opt.onChange;
 			
 			var me = this, //timestamp = +new Date(),
 				ifr = document.createElement('iframe'), ifrdoc;
@@ -150,16 +136,9 @@
 			var ifrwin = ifr.contentWindow, ifrdoc = ifrwin.document;
 			ifrdoc.designMode = "on";
 			ifrdoc.open();
-			ifrdoc.write('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><style type="text/css">html,body{width:100%;height:100%;}body{font-family:"Microsoft YaHei",Arial,Helvetica,sans-serif;font-size:12px;background:#fff;border:0;padding:0;margin:0;word-wrap:break-word;word-break:break-all;line-height:1.2}div,p{margin:0;padding:0;}'+ (cssRules || '') +'</style></head><body spellcheck="false" oncontrolselect="return false;"></body></html>');
+			ifrdoc.write('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><style type="text/css">html,body{width:100%;height:100%;}body{font-family:"Microsoft YaHei", Arial, Helvetica, sans-serif;font-size:12px;background:#fff;border:0;padding:0;margin:0;word-wrap:break-word;word-break:break-all;line-height:1.2}div,p{margin:0;padding:0;}'+ (cssRules || '') +'</style></head><body spellcheck="false" oncontrolselect="return false;"></body></html>');
 			ifrdoc.close();
-			var ifrbody = ifrdoc.body, handler = function(e){
-					var ev = ifrwin.event || e,
-						l = me.text().length + ifrbody.getElementsByTagName('img').length*2;
-					//绑定的事件有：input(ff,chrome), textinput(IE9-11), selectionchange(IE6-11), keyup(IE6-8)
-					onChange && onChange.apply(me, [ev, l]);
-					//console.dir(ev)
-					//console.log(ev.type, ev.eventPhase, l);
-				}
+			var ifrbody = ifrdoc.body;
 			//ifrbody.contentEditable = true;
 			//以下几个函数专为粘贴事件过滤准备
 			ifrbody.oncontextmenu = function(e){
@@ -176,30 +155,28 @@
 			//粘贴时获取选区，在选区中插入过滤后的字符，阻止浏览器粘贴的默认行为
 			ifrbody.onpaste = function(e){
 				var ev = e || ifrwin.event, clipboardData = ev.clipboardData || ifrwin.clipboardData,
-					data = ssEditor.trim(clipboardData.getData('Text')||'');
+					data = ssEditor.trim(clipboardData.getData('text'));
 				//若用户取消了访问剪贴板的权限，则data就是空字符串
-				setDataTransfer(data, me);
-				if(!isIEs) handler(e);
-				/*if(data !== ''){
+				if(data !== ''){
 					tmpDiv[textAttr] = data;
-					me.insertHtmlAtCaret(tmpDiv.innerHTML.replace(rmultiBrs, '<br />') || '');
-				}*/
+					me.insertHtmlAtCaret(tmpDiv.innerHTML || '');
+					//me.insertHtmlAtCaret(ssEditor.stripUselessTag(data) || '');
+				}
 				return false;
 			};
 			ifrbody.ondrop = function(e){
 				var ev = e || ifrwin.event, dataTransfer = ev.dataTransfer,
-					data = ssEditor.trim(dataTransfer.getData('Text')||'');
+					data = ssEditor.trim(dataTransfer.getData('Text'));
 				me.updatebookmark();
+				console.log(me.getRange());
 				//谷歌火狐光标位置获取不正确
 				if(isIEs){
-					/*if(data !== ''){
+					if(data !== ''){
 						tmpDiv[textAttr] = data;
-						me.insertHtmlAtCaret(tmpDiv.innerHTML.replace(rmultiBrs, '<br />') || '');
-					}*/
-					setDataTransfer(data, me);
-					if(!isW3CRangeSupport) handler(ev);
+						me.insertHtmlAtCaret(tmpDiv.innerHTML || '');
+					}
 				}
-				return false;
+				//return false;
 			};
 			ifr.onbeforedeactivate = function(){
 				me.updatebookmark();
@@ -216,32 +193,6 @@
 					me.bookmark = null;
 				}
 			};*/
-			//标准浏览器
-			if(isW3CRangeSupport){
-				if(isIEs){
-					//IE9-11
-					ifrdoc.addEventListener('selectionchange', handler, false);
-//					if(canplaceholder){
-//						ifrbody.addEventListener('DOMSubtreeModified', handler, false);
-//					}else{
-						//解决拖拽文字进入不响应
-						ifrbody.addEventListener('textinput', handler, false);
-//					}
-				}else{
-					//火狐谷歌
-					ifrbody.addEventListener('input', handler, false);
-				}
-			}else{
-				//IE6-8
-				ifrbody.attachEvent('onkeyup', handler);
-//				ifr.attachEvent('onactivate', function(e){
-					ifrdoc.attachEvent('onselectionchange', handler);
-//				});
-//				//IE6,7若blur时解除绑定会出现移除事件滞后的bug
-//				ifr.attachEvent('onbeforedeactivate', function(e){
-//					ifrdoc.detachEvent('onselectionchange', handler);
-//				});
-			}
 			
 			//初始化完成后的回调
 			onReady && onReady.call(this, ifr);
@@ -266,63 +217,61 @@
 		},
 		insertHtmlAtCaret: function(html){
 			var lastRange = this.bookmark, ifrwin = this.editor.contentWindow,
-				ifrdoc = ifrwin.document, ifrbody = ifrdoc.body, me = this;
-			setTimeout(function(){
-				ifrwin.focus();
-				if(lastRange){
-					if(lastRange.getBookmark){
-						//IE6-8必须是先获取上次保存range，再创建新range之后进行移动
-						lastRange = lastRange.getBookmark();
-						
-						var range = ifrdoc.selection.createRange();
-							range.moveToBookmark(lastRange);
-							range.select();
-							this.bookmark = null;
-						range.pasteHTML(html);
-					}else if(isW3CRangeSupport){
-						// IE9-11 and non-IE
-				        var sel = ifrwin.getSelection();
-				        
-				        if(sel.getRangeAt && sel.rangeCount){
-				        	//IE9-11必须获取上次保存的range对象来进行操作,非IE必须重新获取一次新的
-				        	if(!isIEs){
-					        	lastRange = sel.getRangeAt(0);
-					        }
-				        	lastRange.deleteContents();
-				            var el = ifrdoc.createElement("div");
-				            el.innerHTML = html;
-				            var frag = ifrdoc.createDocumentFragment(),
-				            	node, lastNode;
-				            while(node = el.firstChild){
-				                lastNode = frag.appendChild(node);
-				            }
-				            lastRange.insertNode(frag);
-				            if(lastNode){
-				            	//必须使用clone的range
-				                lastRange = lastRange.cloneRange();
-				                lastRange.setStartAfter(lastNode);
-				                lastRange.collapse(true);
-				                sel.removeAllRanges();
-				                sel.addRange(lastRange);
-				            }
+				ifrdoc = ifrwin.document, ifrbody = ifrdoc.body;
+			ifrwin.focus();
+			if(lastRange){
+				if(lastRange.getBookmark){
+					//IE6-8必须是先获取上次保存range，再创建新range之后进行移动
+					lastRange = lastRange.getBookmark();
+					
+					var range = ifrdoc.selection.createRange();
+						range.moveToBookmark(lastRange);
+						range.select();
+						this.bookmark = null;
+					range.pasteHTML(html);
+				}else if(isW3CRangeSupport){
+					// IE9-11 and non-IE
+			        var sel = ifrwin.getSelection();
+			        
+			        if(sel.getRangeAt && sel.rangeCount){
+			        	//IE9-11必须获取上次保存的range对象来进行操作,非IE必须重新获取一次新的
+			        	if(!isIEs){
+				        	lastRange = sel.getRangeAt(0);
 				        }
-					}
-				}else{
-					ifrbody.innerHTML += html;
-					if(isW3CRangeSupport){
-						try{
-							var sel = ifrwin.getSelection(), selectedRange = sel.getRangeAt(0);
-							selectedRange = selectedRange.cloneRange();
-			                selectedRange.setStartAfter(ifrbody.lastChild);
-			                selectedRange.collapse(true);
+			        	lastRange.deleteContents();
+			            var el = ifrdoc.createElement("div");
+			            el.innerHTML = html;
+			            var frag = ifrdoc.createDocumentFragment(),
+			            	node, lastNode;
+			            while(node = el.firstChild){
+			                lastNode = frag.appendChild(node);
+			            }
+			            lastRange.insertNode(frag);
+			            if(lastNode){
+			            	//必须使用clone的range
+			                lastRange = lastRange.cloneRange();
+			                lastRange.setStartAfter(lastNode);
+			                lastRange.collapse(true);
 			                sel.removeAllRanges();
-			                sel.addRange(selectedRange);
-						}catch(e){  }
-					}
+			                sel.addRange(lastRange);
+			            }
+			        }
 				}
-				//链式调用直接返回
-				return me.updatebookmark();
-			});
+			}else{
+				ifrbody.innerHTML += html;
+				if(isW3CRangeSupport){
+					try{
+						var sel = ifrwin.getSelection(), selectedRange = sel.getRangeAt(0);
+						selectedRange = selectedRange.cloneRange();
+		                selectedRange.setStartAfter(ifrbody.lastChild);
+		                selectedRange.collapse(true);
+		                sel.removeAllRanges();
+		                sel.addRange(selectedRange);
+					}catch(e){  }
+				}
+			}
+			//链式调用直接返回
+			return this.updatebookmark();
 		},
 		getRange: function(){
 			var lastRange = this.bookmark, ifrwin = this.editor.contentWindow,
@@ -335,6 +284,7 @@
 			}*/
 			if(isW3CRangeSupport){
 				var selectionRange = ifrwin.getSelection(), range = ifrdoc.createRange();
+				console.log(selectionRange.rangeCount)
 				if(selectionRange.getRangeAt && selectionRange.rangeCount){
 					selectionRange = selectionRange.getRangeAt(0);
 					/*if(isIEs && lastRange){
@@ -356,31 +306,9 @@
 			}
 		},
 		focus: function(){
-			var lastRange = this.bookmark, ifrwin = this.editor.contentWindow,
-				ifrdoc = ifrwin.document, ifrbody = ifrdoc.body;
-			setTimeout(function(){
-				ifrwin.focus();
-				if(isW3CRangeSupport){
-					//http://www.cnblogs.com/rainman/archive/2011/02/28/1967488.html
-					//http://www.php230.com/1412749801.html
-					//http://1.liangyiblog.sinaapp.com/?p=480
-					//http://wenku.baidu.com/link?url=680kH0cSeCP7h_Lw5yXQf5VY10TiY-_MyOrra2E3MaCeTCDj0gbg0EiyYsxgrGGpRgvnoSZSKGwBhse1zxUVD03ctL7TnM8Lf1fbtXvjXYa
-					ifrwin.getSelection().collapse(ifrbody, ifrbody.childNodes.length);
-				}else{
-					//http://bbs.blueidea.com/forum.php?mod=viewthread&tid=603197
-					//http://www.cnblogs.com/cskk/archive/2013/03/30/divs.html
-					//http://zhujinguo.iteye.com/blog/765929
-					var r = ifrbody.createTextRange(); 
-					r.collapse(false);
-					r.select();
-					/*var r = ifrdoc.selection.createRange(), l = ifrbody.innerText.length;
-					
-					r.collapse(false);
-					r.moveStart('character', l);
-					r.moveEnd("character", l);
-					r.select();*/
-				}
-			});
+			var lastRange = this.bookmark, ifrwin = this.editor.contentWindow//,
+				//ifrdoc = ifrwin.document, ifrbody = ifrdoc.body;
+			ifrwin.focus();
 			//获取已选光标位置区域
 			/*if(lastRange){
 				
@@ -428,11 +356,8 @@ var i = 0, editor = ssEditor('J_editor', {
 	//'target': document.getElementById('J_editor'),
 	'onReady': function(ifr){
 		//console.log(this, ifr);
-		var _this = this, ifrwin = _this.editor.contentWindow,
-			ifrdoc = ifrwin.document, ifrbody = ifrdoc.body;
+		var _this = this;
 		//_this.text('<div style="background:#f00">123</div>');
-		ifrbody.innerHTML = '<span contenteditable="false">to:cao</span>asda<img src="../webui/css/img/diy/1_close.png" title="123" />';
-		_this.focus();
 		document.getElementById('btn').onclick = 
 		document.getElementById('a').onclick = 
 		document.getElementById('emotion').onclick = function(){
@@ -441,8 +366,14 @@ var i = 0, editor = ssEditor('J_editor', {
 		document.getElementById('test').onclick = function(){
 			//console.log(_this.getRange());
 		}
-	},
-	cssRules: 'body span{background:#ff0;}'
+	}/*,
+	//cssRules: 'body{background:#ff0;}',
+	filter: function(html){
+		return html.replace(/[<>]/gi, function($0, $1){
+			return 
+			//console.log(arguments, $0, $1)
+		});
+	}*/
 });
 /*function(ifr){
 	var _this = this;
@@ -453,6 +384,21 @@ var i = 0, editor = ssEditor('J_editor', {
 }*/
 //alert(editor.text());
 //editor.destroy();
+
+
+(function(win){
+	try{
+		var p = win.parent, ifrs = p.document.getElementsByTagName('iframe');
+		for(var i=0, il=ifrs.length; i<il; i++){
+			var ifr = ifrs[i];
+			if(ifr.contentWindow == win){
+				ifr.style.height = ifr.height = win.document.body.scrollHeight;
+				break;
+			}
+		}
+	}catch(e){
+	}
+})(this);
 </script>
 </body>
 </html>
