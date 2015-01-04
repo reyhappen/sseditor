@@ -3,7 +3,7 @@
  * @email 503593966@qq.com
  * @phone 15671557819
  * @github:https://github.com/reyhappen
- * @version 1.0
+ * @version 1.1
  * */
 
 /*
@@ -43,6 +43,7 @@
  * public fns:
  * 		this.html(), //like jquery
  * 		this.text(), //like jquery
+ * 		this.ssContents() //get clean contents(without width height etc.)
  * 		this.focus(), //focus in iframe body
  * 		this.updatebookmark() //update the range and save it
  * 		this.insertHtmlAtCaret(html) //insert html into editor
@@ -58,6 +59,7 @@
 	var tmpInputel = document.createElement('input'),
 		canplaceholder = 'placeholder' in tmpInputel, //IE10-11, non IE
 		isIEs = 'onbeforedeactivate' in document, //non IE
+		IE6_10 = 'attachEvent' in document,
 		isW3CRangeSupport = !!win.getSelection, //w3c
 		tmpDiv = document.createElement('div'), //临时用途的div
 		textAttr = 'innerText' in tmpDiv ? 'innerText' : 'textContent', //IE6-8用innerText
@@ -65,8 +67,8 @@
 		rtags = /(<[^>]*>)/g, //用于过滤标签
 		rmultiBrs = /(<br[^>]*>[\s\uFEFF\xA0]*)+/gi, //多个换行
 		rnewlinereturn = /\r|\n/g, //回车换行
-		remotions = new RegExp('<img[^<>]*class="?J_emotion'+ d +'"?[^>]*>', 'gi'), //表情
-		rnotBrEmotion = new RegExp('<(?!br|\/?img[^<>]*class="?J_emotion'+ d +'"?)[^<>]*>', 'gi'), //非换行和表情，用于过滤不必要标签
+		remotions = new RegExp('<img (width="\\d+" height="\\d+")([^>]*)(style="?width:\\s?\\d+\\w*;\\s?height:\\s?\\d+\\w*;?"?)([^>]*)>', 'gi'), //IE11匹配出宽高样式
+		rnotBrEmotion = new RegExp('<(?!br\\/?|img[^<>]*class="?J_emotion'+ d +'"?)[^<>]*>', 'gi'), //非换行和表情，用于过滤不必要标签
 		defaultOptions = { //参数默认设置
 			onReady: null,
 			cssRules: '',
@@ -93,8 +95,9 @@
 	};
 	//去除不必要标签
 	ssEditor.stripUselessTag = function(html){
-		//去除非br和表情的标签，合并多个换行为一个
-		return html.replace(rnotBrEmotion, '').replace(rmultiBrs, '<br />').replace(/<br[^>]*>$/,'').replace(/^(&nbsp;)+|($1)+$/, '').replace(/width="?\d+"?|height="?\d+"?/g, '');
+		console.log(html)
+		//去除非br和表情的标签，合并多个换行为一个，去除表情标签中的宽高属性（主要是IE11）
+		return html.replace(rnotBrEmotion, '').replace(rmultiBrs, '<br />').replace(/^(<br[^>]*>)|($1)+$/,'').replace(/^(&nbsp;)+|($1)+$/, '').replace(remotions, '<img $2$4 />');
 	}
 	
 	//为外部插件设置相关属性提供唯一性
@@ -189,8 +192,9 @@
 			var ifrwin = ifr.contentWindow, //获取编辑区iframe的window对象
 				ifrdoc = ifrwin.document; //获取iframe的document
 			ifrdoc.designMode = "on"; //设置可编辑状态
+			
 			ifrdoc.open(); //打开文档流
-			ifrdoc.write('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><style type="text/css">html,body{overflow-y:auto;width:100%;height:100%;}body{font-family:"Microsoft YaHei",Arial,Helvetica,sans-serif;font-size:12px;background:#fff;border:0;padding:0;margin:0;word-wrap:break-word;word-break:break-all;line-height:1.5}div,p{margin:0;padding:0;}'+ opt.cssRules +'</style></head><body spellcheck="false" oncontrolselect="return false;">'+ opt.defaultContents +'</body></html>'); //文档写入内容
+			ifrdoc.write('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><style type="text/css">html,body{overflow-y:auto;width:100%;height:100%;}body{font-family:"Microsoft YaHei",Arial,Helvetica,sans-serif;font-size:12px;background:#fff;border:0;padding:0;margin:0;word-wrap:break-word;word-break:break-all;line-height:1.5}div,p{margin:0;padding:0;}'+ opt.cssRules +'</style></head><body spellcheck="false">'+ opt.defaultContents +'</body></html>'); //文档写入内容
 			ifrdoc.close(); //关闭文档流
 			
 			var ifrbody = ifrdoc.body, //获取body
@@ -200,6 +204,18 @@
 					me.sscontLenth = me.text().replace(rnewlinereturn, '').length + ifrbody.getElementsByTagName('img').length*2;
 					onChange && onChange.apply(me, [ev, me.sscontLenth]);
 				}
+			
+			if(IE6_10){
+				ifrdoc.attachEvent('oncontrolselect', function(){
+					return false;
+				});
+			}else{
+				try{
+			 		//火狐去掉调整图片的拉选框
+					//ifrdoc.execCommand('enableObjectResizing', false, 'false');
+				}catch(e){
+				}
+			}
 			
 			//以下几个函数专为粘贴事件过滤准备
 			//右击时更新选区
