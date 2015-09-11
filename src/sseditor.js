@@ -196,6 +196,7 @@
 			ifrdoc.open(); //打开文档流
 			ifrdoc.write('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><style type="text/css">html,body{overflow-y:auto;width:100%;height:100%;}body{font-family:"Microsoft YaHei",Arial,Helvetica,sans-serif;font-size:12px;background:#fff;border:0;padding:0;margin:0;word-wrap:break-word;word-break:break-all;line-height:1.5}div,p{margin:0;padding:0;}'+ opt.cssRules +'</style></head><body spellcheck="false">'+ opt.defaultContents +'</body></html>'); //文档写入内容
 			ifrdoc.close(); //关闭文档流
+			ifrdoc.charset = 'utf-8';
 			
 			var ifrbody = ifrdoc.body, //获取body
 				handler = function(e){
