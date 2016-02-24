@@ -148,6 +148,8 @@
 			//按键按下事件早于paste，按下时记下选区
 			ifrbody.onkeydown = function(e){
 				var ev = e || ifrwin.event;
+				//防止ctrl+b，ctrl+u，ctrl+i格式化可编辑内容
+				if(ev.ctrlKey) return false;
 				//快捷键粘贴
 				if(ev.ctrlKey && ev.keyCode == 86){
 					me.updatebookmark();
